@@ -116,7 +116,7 @@ async function main() {
   const args = Deno.args;
 
   if (args.length < 2) {
-    console.error('Usage: deno run --allow-net --allow-read --allow-write srt_translator.ts <input_file.srt> <target_language> [output_file.srt]');
+    console.error('Usage: deno run --allow-net --allow-read --allow-write jsr:@t1ckbase/srt-translator <input_file.srt> <target_language> [output_file.srt]');
     Deno.exit(1);
   }
 
