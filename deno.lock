@@ -2,7 +2,8 @@
   "version": "4",
   "specifiers": {
     "jsr:@std/cli@^1.0.14": "1.0.14",
-    "jsr:@std/path@^1.0.8": "1.0.8"
+    "jsr:@std/path@^1.0.8": "1.0.8",
+    "npm:@remotion/captions@^4.0.279": "4.0.279"
   },
   "jsr": {
     "@std/cli@1.0.14": {
@@ -10,6 +11,11 @@
     },
     "@std/path@1.0.8": {
       "integrity": "548fa456bb6a04d3c1a1e7477986b6cffbce95102d0bb447c67c4ee70e0364be"
+    }
+  },
+  "npm": {
+    "@remotion/captions@4.0.279": {
+      "integrity": "sha512-5Y2s/NKfL6QpWG6ZZ3QuUfn4OA3EE0iHw9C15cJDnQ6c3kbeE/OhhOIgky00+nR9MD1stV+W/HmkhpDQqHJstw=="
     }
   },
   "redirects": {
@@ -99,7 +105,8 @@
   "workspace": {
     "dependencies": [
       "jsr:@std/cli@^1.0.14",
-      "jsr:@std/path@^1.0.8"
+      "jsr:@std/path@^1.0.8",
+      "npm:@remotion/captions@^4.0.279"
     ]
   }
 }

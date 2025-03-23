@@ -1,62 +1,8 @@
 import { parse as parsePath } from '@std/path';
+import { parseSrt, serializeSrt } from '@remotion/captions';
 import { isGoogleLanguage, translate } from './google-translate.ts';
 import type { GoogleLanguage } from './languages.ts';
 import { ProgressBar } from '@std/cli/unstable-progress-bar';
-
-// Define the SRT subtitle entry interface
-interface SubtitleEntry {
-  id: number;
-  startTime: string;
-  endTime: string;
-  text: string;
-}
-
-/**
- * Parse SRT file content into structured subtitle entries
- * @param content The content of the SRT file as a string
- * @returns Array of subtitle entries
- */
-function parseSRT(content: string): SubtitleEntry[] {
-  const entries: SubtitleEntry[] = [];
-
-  // Split content by double newline (each subtitle block)
-  const blocks = content.trim().split(/\n\s*\n/);
-
-  for (const block of blocks) {
-    const lines = block.trim().split('\n');
-    if (lines.length < 3) continue;
-
-    // Parse the entry ID
-    const id = parseInt(lines[0].trim(), 10);
-
-    // Parse the timestamp line
-    const timeLine = lines[1].trim();
-    const [startTime, endTime] = timeLine.split(' --> ');
-
-    // Get text content (can be multiple lines)
-    const text = lines.slice(2).join('\n');
-
-    entries.push({
-      id,
-      startTime,
-      endTime,
-      text,
-    });
-  }
-
-  return entries;
-}
-
-/**
- * Format subtitle entries back to SRT format
- * @param entries Array of subtitle entries
- * @returns SRT formatted string
- */
-function formatSRT(entries: SubtitleEntry[]): string {
-  return entries.map((entry) => {
-    return `${entry.id}\n${entry.startTime} --> ${entry.endTime}\n${entry.text}\n`;
-  }).join('\n');
-}
 
 /**
  * Translate SRT file content to the target language using parallel processing
@@ -66,8 +12,9 @@ function formatSRT(entries: SubtitleEntry[]): string {
  * @returns Translated SRT content
  */
 async function translateSRT(content: string, targetLang: GoogleLanguage): Promise<string> {
-  const entries = parseSRT(content);
-  const totalEntries = entries.length;
+  // Parse SRT using Remotion's parser
+  const { captions } = parseSrt({ input: content });
+  const totalEntries = captions.length;
 
   console.log(`Found ${totalEntries} subtitle entries to translate`);
 
@@ -80,15 +27,19 @@ async function translateSRT(content: string, targetLang: GoogleLanguage): Promis
   });
 
   // Create an array of translation promises
-  const translationPromises = entries.map(async (entry) => {
+  const translationPromises = captions.map(async (caption) => {
     try {
       // Translate the text using the provided translate function
-      const translatedText = await translate(entry.text, 'auto', targetLang);
-      return { ...entry, text: translatedText };
+      const translatedText = await translate(caption.text, 'auto', targetLang);
+      // Return a new caption object with translated text
+      return {
+        ...caption,
+        text: translatedText,
+      };
     } catch (error) {
-      console.error(`\nError translating subtitle #${entry.id}: ${error instanceof Error ? error.message : error}`);
-      // Return the original entry if translation fails
-      return entry;
+      console.error(`\nError translating subtitle at ${caption.startMs}ms: ${error instanceof Error ? error.message : error}`);
+      // Return the original caption if translation fails
+      return caption;
     } finally {
       // Update progress bar
       progressBar.add(1);
@@ -96,13 +47,14 @@ async function translateSRT(content: string, targetLang: GoogleLanguage): Promis
   });
 
   // Wait for all translations to complete
-  const translatedEntries = await Promise.all(translationPromises);
+  const translatedCaptions = await Promise.all(translationPromises);
 
   // End the progress bar
   await progressBar.end();
-  await Deno.stdout.write(new TextEncoder().encode(''));
+  await Deno.stdout.write(new TextEncoder().encode('\n'));
 
-  return formatSRT(translatedEntries);
+  // Serialize back to SRT format using Remotion's serializer
+  return serializeSrt({ lines: translatedCaptions.map((caption) => [caption]) });
 }
 
 /**
