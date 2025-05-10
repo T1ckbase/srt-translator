@@ -9,9 +9,14 @@ import { ProgressBar } from '@std/cli/unstable-progress-bar';
  * with a progress bar
  * @param content The content of the SRT file as a string
  * @param targetLang The target language code
+ * @param keepOriginal Whether to keep the original text above the translation
  * @returns Translated SRT content
  */
-async function translateSRT(content: string, targetLang: GoogleLanguage): Promise<string> {
+async function translateSRT(
+  content: string,
+  targetLang: GoogleLanguage,
+  keepOriginal = false,
+): Promise<string> {
   // Parse SRT using Remotion's parser
   const { captions } = parseSrt({ input: content });
   const totalEntries = captions.length;
@@ -34,7 +39,7 @@ async function translateSRT(content: string, targetLang: GoogleLanguage): Promis
       // Return a new caption object with translated text
       return {
         ...caption,
-        text: translatedText,
+        text: keepOriginal ? `${caption.text}\n${translatedText}` : translatedText,
       };
     } catch (error) {
       console.error(`\nError translating subtitle at ${caption.startMs}ms: ${error instanceof Error ? error.message : error}`);
@@ -68,7 +73,7 @@ async function main() {
   const args = Deno.args;
 
   if (args.length < 2) {
-    console.error('Usage: deno run --allow-net --allow-read --allow-write jsr:@t1ckbase/srt-translator <input_file.srt> <target_language> [output_file.srt]');
+    console.error('Usage: deno run --allow-net --allow-read --allow-write jsr:@t1ckbase/srt-translator <input_file.srt> <target_language> [output_file.srt] [--keep-original]');
     Deno.exit(1);
   }
 
@@ -83,7 +88,9 @@ async function main() {
 
   // Generate output path if not provided
   let outputPath = args[2];
-  if (!outputPath) {
+  // Check for --keep-original flag
+  const keepOriginal = args.includes('--keep-original');
+  if (!outputPath || outputPath === '--keep-original') {
     const parsedPath = parsePath(inputPath);
     outputPath = `${parsedPath.dir}/${parsedPath.name}.${targetLang}${parsedPath.ext}`;
   }
@@ -95,7 +102,7 @@ async function main() {
     console.log(`Translating subtitles from ${inputPath} to ${targetLang}...`);
 
     const startTime = performance.now();
-    const translatedContent = await translateSRT(content, targetLang);
+    const translatedContent = await translateSRT(content, targetLang, keepOriginal);
     const endTime = performance.now();
 
     // Calculate and display elapsed time
