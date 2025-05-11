@@ -10,12 +10,14 @@ import { ProgressBar } from '@std/cli/unstable-progress-bar';
  * @param content The content of the SRT file as a string
  * @param targetLang The target language code
  * @param keepOriginal Whether to keep the original text above the translation
+ * @param removeLineBreaks Whether to remove line breaks in the original text before translation
  * @returns Translated SRT content
  */
 async function translateSRT(
   content: string,
   targetLang: GoogleLanguage,
   keepOriginal = false,
+  removeLineBreaks = false,
 ): Promise<string> {
   // Parse SRT using Remotion's parser
   const { captions } = parseSrt({ input: content });
@@ -34,12 +36,14 @@ async function translateSRT(
   // Create an array of translation promises
   const translationPromises = captions.map(async (caption) => {
     try {
+      // Optionally remove line breaks from original text
+      const originalText = removeLineBreaks ? caption.text.replace(/[\r\n]+/g, ' ') : caption.text;
       // Translate the text using the provided translate function
-      const translatedText = await translate(caption.text, 'auto', targetLang);
+      const translatedText = await translate(originalText, 'auto', targetLang);
       // Return a new caption object with translated text
       return {
         ...caption,
-        text: keepOriginal ? `${caption.text}\n${translatedText}` : translatedText,
+        text: keepOriginal ? `${originalText}\n${translatedText}` : translatedText,
       };
     } catch (error) {
       console.error(`\nError translating subtitle at ${caption.startMs}ms: ${error instanceof Error ? error.message : error}`);
@@ -73,7 +77,7 @@ async function main() {
   const args = Deno.args;
 
   if (args.length < 2) {
-    console.error('Usage: deno run --allow-net --allow-read --allow-write jsr:@t1ckbase/srt-translator <input_file.srt> <target_language> [output_file.srt] [--keep-original]');
+    console.error('Usage: deno run --allow-net --allow-read --allow-write jsr:@t1ckbase/srt-translator <input_file.srt> <target_language> [output_file.srt] [--keep-original] [--remove-linebreaks]');
     Deno.exit(1);
   }
 
@@ -88,9 +92,10 @@ async function main() {
 
   // Generate output path if not provided
   let outputPath = args[2];
-  // Check for --keep-original flag
+  // Check for --keep-original and --remove-linebreaks flags
   const keepOriginal = args.includes('--keep-original');
-  if (!outputPath || outputPath === '--keep-original') {
+  const removeOriginalLineBreaks = args.includes('--remove-linebreaks');
+  if (!outputPath || outputPath === '--keep-original' || outputPath === '--remove-linebreaks') {
     const parsedPath = parsePath(inputPath);
     outputPath = `${parsedPath.dir}/${parsedPath.name}.${targetLang}${parsedPath.ext}`;
   }
@@ -102,7 +107,7 @@ async function main() {
     console.log(`Translating subtitles from ${inputPath} to ${targetLang}...`);
 
     const startTime = performance.now();
-    const translatedContent = await translateSRT(content, targetLang, keepOriginal);
+    const translatedContent = await translateSRT(content, targetLang, keepOriginal, removeOriginalLineBreaks);
     const endTime = performance.now();
 
     // Calculate and display elapsed time
